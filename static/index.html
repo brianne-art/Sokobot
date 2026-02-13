@@ -18,6 +18,26 @@
   }
   h1 { color: #e94560; margin-bottom: 20px; }
 
+  /* --- Mode tabs --- */
+  .mode-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+  }
+  .mode-tab {
+    padding: 10px 28px;
+    border: 1px solid #0f3460;
+    background: #16213e;
+    color: #888;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .mode-tab:first-child { border-radius: 6px 0 0 6px; }
+  .mode-tab:last-child { border-radius: 0 6px 6px 0; }
+  .mode-tab.active { background: #0f3460; color: #e0e0e0; }
+  .mode-tab:hover { color: #e0e0e0; }
+
   .controls {
     display: flex;
     gap: 10px;
@@ -26,12 +46,19 @@
     flex-wrap: wrap;
     justify-content: center;
   }
-  select, button {
+  select, button, input[type="number"] {
     padding: 8px 16px;
     border: none;
     border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
+  }
+  input[type="number"] {
+    width: 60px;
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #0f3460;
+    text-align: center;
   }
   select {
     background: #16213e;
@@ -45,6 +72,7 @@
   }
   button:hover:not(:disabled) { background: #e94560; }
   button:disabled { opacity: 0.4; cursor: default; }
+  label { font-size: 13px; color: #aaa; }
 
   #grid {
     display: inline-grid;
@@ -53,6 +81,7 @@
     background: #16213e;
     padding: 10px;
     border-radius: 10px;
+    user-select: none;
   }
   .cell {
     width: 48px;
@@ -67,49 +96,33 @@
   .cell-floor { background: #232342; }
   .cell-goal { background: #232342; }
   .cell-goal::after { content: ''; width: 12px; height: 12px; background: #e94560; border-radius: 50%; }
-  .cell-box {
-    background: #232342;
-    position: relative;
-  }
+  .cell-box { background: #232342; }
   .cell-box::after {
     content: '';
-    width: 34px;
-    height: 34px;
+    width: 34px; height: 34px;
     background: #c47f17;
     border-radius: 6px;
     border: 2px solid #a06010;
   }
-  .cell-box-on-goal {
-    background: #232342;
-    position: relative;
-  }
+  .cell-box-on-goal { background: #232342; }
   .cell-box-on-goal::after {
     content: '';
-    width: 34px;
-    height: 34px;
+    width: 34px; height: 34px;
     background: #4ecca3;
     border-radius: 6px;
     border: 2px solid #38a882;
   }
-  .cell-player {
-    background: #232342;
-    position: relative;
-  }
+  .cell-player { background: #232342; }
   .cell-player::after {
     content: '';
-    width: 30px;
-    height: 30px;
+    width: 30px; height: 30px;
     background: #e94560;
     border-radius: 50%;
   }
-  .cell-player-on-goal {
-    background: #232342;
-    position: relative;
-  }
+  .cell-player-on-goal { background: #232342; }
   .cell-player-on-goal::after {
     content: '';
-    width: 30px;
-    height: 30px;
+    width: 30px; height: 30px;
     background: #e94560;
     border-radius: 50%;
     border: 3px solid #4ecca3;
@@ -137,16 +150,73 @@
     color: #aaa;
   }
   #move-display .current-move { color: #e94560; font-weight: bold; }
+
+  /* --- Tool palette --- */
+  .tool-palette {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .tool-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #16213e;
+    color: #888;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tool-btn:hover { color: #e0e0e0; }
+  .tool-btn.active { border-color: #e94560; color: #e0e0e0; }
+  .tool-swatch {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
 
 <h1>Sokoban Solver</h1>
 
-<div class="controls">
+<div class="mode-tabs">
+  <div class="mode-tab active" data-mode="play">Play</div>
+  <div class="mode-tab" data-mode="edit">Edit</div>
+</div>
+
+<!-- Play mode controls -->
+<div id="play-controls" class="controls">
   <select id="puzzle-select"></select>
   <button id="load-btn">Load</button>
   <button id="solve-btn" disabled>Solve</button>
+</div>
+
+<!-- Edit mode controls -->
+<div id="edit-controls" class="controls hidden">
+  <label>Rows</label>
+  <input type="number" id="edit-rows" value="6" min="3" max="12">
+  <label>Cols</label>
+  <input type="number" id="edit-cols" value="6" min="3" max="12">
+  <button id="resize-btn">Resize</button>
+  <button id="clear-btn">Clear</button>
+  <button id="solve-custom-btn">Solve Custom</button>
+</div>
+
+<!-- Tool palette (edit mode only) -->
+<div id="tool-palette" class="tool-palette hidden">
+  <div class="tool-btn active" data-tool="wall"><span class="tool-swatch" style="background:#3a3a5c"></span>Wall</div>
+  <div class="tool-btn" data-tool="floor"><span class="tool-swatch" style="background:#232342"></span>Floor</div>
+  <div class="tool-btn" data-tool="player"><span class="tool-swatch" style="background:#e94560;border-radius:50%"></span>Player</div>
+  <div class="tool-btn" data-tool="box"><span class="tool-swatch" style="background:#c47f17"></span>Box</div>
+  <div class="tool-btn" data-tool="goal"><span class="tool-swatch" style="background:#e94560;border-radius:50%;width:10px;height:10px"></span>Goal</div>
 </div>
 
 <div id="grid"></div>
@@ -161,6 +231,7 @@
 <div id="move-display"></div>
 
 <script>
+// --- Element refs ---
 const puzzleSelect = document.getElementById('puzzle-select');
 const loadBtn = document.getElementById('load-btn');
 const solveBtn = document.getElementById('solve-btn');
@@ -170,16 +241,72 @@ const nextBtn = document.getElementById('next-btn');
 const gridEl = document.getElementById('grid');
 const statusEl = document.getElementById('status');
 const moveDisplay = document.getElementById('move-display');
+const playControls = document.getElementById('play-controls');
+const editControls = document.getElementById('edit-controls');
+const toolPalette = document.getElementById('tool-palette');
+const editRowsInput = document.getElementById('edit-rows');
+const editColsInput = document.getElementById('edit-cols');
+const resizeBtn = document.getElementById('resize-btn');
+const clearBtn = document.getElementById('clear-btn');
+const solveCustomBtn = document.getElementById('solve-custom-btn');
 
+// --- State ---
 let puzzles = [];
 let currentPuzzleText = null;
-let grid = null;   // {walls, goals, dimensions}
-let steps = null;  // array of {player, boxes}
-let moves = null;  // array of direction strings
+let grid = null;
+let steps = null;
+let moves = null;
 let stepIndex = 0;
 let playInterval = null;
+let mode = 'play'; // 'play' or 'edit'
+let editorGrid = null; // 2D array
+let activeTool = 'wall';
+let mouseDown = false;
 
-// --- Init ---
+// --- Mode switching ---
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const newMode = tab.dataset.mode;
+    if (newMode === mode) return;
+    mode = newMode;
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    stopPlayback();
+
+    if (mode === 'play') {
+      playControls.classList.remove('hidden');
+      editControls.classList.add('hidden');
+      toolPalette.classList.add('hidden');
+      gridEl.innerHTML = '';
+      steps = null; moves = null;
+      statusEl.innerHTML = '';
+      moveDisplay.innerHTML = '';
+      solveBtn.disabled = true;
+      setStepButtonState();
+    } else {
+      playControls.classList.add('hidden');
+      editControls.classList.remove('hidden');
+      toolPalette.classList.remove('hidden');
+      steps = null; moves = null;
+      statusEl.innerHTML = '<span class="value">Click cells to design your puzzle.</span>';
+      moveDisplay.innerHTML = '';
+      setStepButtonState();
+      if (!editorGrid) initEditorGrid(6, 6);
+      renderEditorGrid();
+    }
+  });
+});
+
+// --- Tool palette ---
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTool = btn.dataset.tool;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// --- Init puzzles ---
 fetch('/api/puzzles')
   .then(r => r.json())
   .then(data => {
@@ -192,23 +319,28 @@ fetch('/api/puzzles')
     });
   });
 
-// --- Load puzzle ---
+// ============================================================
+// PLAY MODE
+// ============================================================
+
 loadBtn.addEventListener('click', () => {
   stopPlayback();
   const selected = puzzles.find(p => p.id === puzzleSelect.value);
   if (!selected) return;
   currentPuzzleText = selected.text;
-  steps = null;
-  moves = null;
-  stepIndex = 0;
+  loadPuzzleText(currentPuzzleText);
+  solveBtn.disabled = false;
+  statusEl.innerHTML = '<span class="value">Puzzle loaded. Click Solve.</span>';
+  moveDisplay.innerHTML = '';
+});
 
-  // Parse the text to get grid info for initial render
-  const lines = currentPuzzleText.split('\n');
+function loadPuzzleText(text) {
+  steps = null; moves = null; stepIndex = 0;
+  const lines = text.split('\n');
   const rows = lines.length;
   const cols = Math.max(...lines.map(l => l.length));
   const walls = [], goals = [], boxes = [];
   let player = null;
-
   for (let r = 0; r < lines.length; r++) {
     for (let c = 0; c < lines[r].length; c++) {
       const ch = lines[r][c];
@@ -220,28 +352,24 @@ loadBtn.addEventListener('click', () => {
       else if (ch === '.') goals.push([r, c]);
     }
   }
-
   grid = { walls, goals, dimensions: [rows, cols] };
   steps = [{ player, boxes }];
   stepIndex = 0;
-
   renderGrid();
-  solveBtn.disabled = false;
   setStepButtonState();
-  statusEl.innerHTML = '<span class="value">Puzzle loaded. Click Solve.</span>';
-  moveDisplay.innerHTML = '';
-});
+}
 
-// --- Solve ---
-solveBtn.addEventListener('click', () => {
+solveBtn.addEventListener('click', () => solvePuzzle(currentPuzzleText, solveBtn));
+
+function solvePuzzle(puzzleText, btnToDisable) {
   stopPlayback();
-  solveBtn.disabled = true;
+  if (btnToDisable) btnToDisable.disabled = true;
   statusEl.innerHTML = '<span class="value">Solving...</span>';
 
   fetch('/api/solve', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ puzzle: currentPuzzleText }),
+    body: JSON.stringify({ puzzle: puzzleText }),
   })
     .then(r => r.json())
     .then(data => {
@@ -259,14 +387,14 @@ solveBtn.addEventListener('click', () => {
         renderMoveList();
       } else {
         statusEl.innerHTML = `<span class="value" style="color:#e94560">${data.error}</span>`;
-        solveBtn.disabled = false;
+        if (btnToDisable) btnToDisable.disabled = false;
       }
     })
     .catch(err => {
       statusEl.innerHTML = `<span class="value" style="color:#e94560">Error: ${err.message}</span>`;
-      solveBtn.disabled = false;
+      if (btnToDisable) btnToDisable.disabled = false;
     });
-});
+}
 
 // --- Step controls ---
 prevBtn.addEventListener('click', () => { stopPlayback(); goStep(stepIndex - 1); });
@@ -304,7 +432,7 @@ function setStepButtonState() {
   playBtn.disabled = !hasSolution;
 }
 
-// --- Rendering ---
+// --- Rendering (play mode / solution playback) ---
 function renderGrid() {
   if (!grid || !steps) return;
   const [rows, cols] = grid.dimensions;
@@ -324,21 +452,13 @@ function renderGrid() {
       cell.className = 'cell';
       const key = r + ',' + c;
 
-      if (wallSet.has(key)) {
-        cell.classList.add('cell-wall');
-      } else if (key === playerKey && goalSet.has(key)) {
-        cell.classList.add('cell-player-on-goal');
-      } else if (key === playerKey) {
-        cell.classList.add('cell-player');
-      } else if (boxSet.has(key) && goalSet.has(key)) {
-        cell.classList.add('cell-box-on-goal');
-      } else if (boxSet.has(key)) {
-        cell.classList.add('cell-box');
-      } else if (goalSet.has(key)) {
-        cell.classList.add('cell-goal');
-      } else {
-        cell.classList.add('cell-floor');
-      }
+      if (wallSet.has(key)) cell.classList.add('cell-wall');
+      else if (key === playerKey && goalSet.has(key)) cell.classList.add('cell-player-on-goal');
+      else if (key === playerKey) cell.classList.add('cell-player');
+      else if (boxSet.has(key) && goalSet.has(key)) cell.classList.add('cell-box-on-goal');
+      else if (boxSet.has(key)) cell.classList.add('cell-box');
+      else if (goalSet.has(key)) cell.classList.add('cell-goal');
+      else cell.classList.add('cell-floor');
 
       gridEl.appendChild(cell);
     }
@@ -355,6 +475,191 @@ function renderMoveList() {
   });
   moveDisplay.innerHTML = `Step ${stepIndex}/${steps.length - 1}: ` + parts.join(' ');
 }
+
+// ============================================================
+// EDIT MODE
+// ============================================================
+
+function initEditorGrid(rows, cols) {
+  editorGrid = [];
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) {
+        row.push('wall');
+      } else {
+        row.push('floor');
+      }
+    }
+    editorGrid.push(row);
+  }
+}
+
+function cellClass(type) {
+  const map = {
+    wall: 'cell-wall',
+    floor: 'cell-floor',
+    player: 'cell-player',
+    box: 'cell-box',
+    goal: 'cell-goal',
+    player_on_goal: 'cell-player-on-goal',
+    box_on_goal: 'cell-box-on-goal',
+  };
+  return map[type] || 'cell-floor';
+}
+
+function renderEditorGrid() {
+  if (!editorGrid) return;
+  const rows = editorGrid.length;
+  const cols = editorGrid[0].length;
+
+  gridEl.style.gridTemplateColumns = `repeat(${cols}, 48px)`;
+  gridEl.innerHTML = '';
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell ' + cellClass(editorGrid[r][c]);
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+
+      cell.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        mouseDown = true;
+        applyTool(r, c);
+      });
+      cell.addEventListener('mouseover', () => {
+        if (mouseDown) applyTool(r, c);
+      });
+
+      gridEl.appendChild(cell);
+    }
+  }
+}
+
+document.addEventListener('mouseup', () => { mouseDown = false; });
+
+function hasGoal(type) {
+  return type === 'goal' || type === 'player_on_goal' || type === 'box_on_goal';
+}
+
+function applyTool(r, c) {
+  const current = editorGrid[r][c];
+
+  if (activeTool === 'wall') {
+    editorGrid[r][c] = 'wall';
+  } else if (activeTool === 'floor') {
+    // Clearing: if compound, preserve the goal
+    if (current === 'player_on_goal' || current === 'box_on_goal') {
+      editorGrid[r][c] = 'goal';
+    } else {
+      editorGrid[r][c] = 'floor';
+    }
+  } else if (activeTool === 'player') {
+    // Remove existing player first
+    removePlayer();
+    editorGrid[r][c] = hasGoal(current) ? 'player_on_goal' : 'player';
+  } else if (activeTool === 'box') {
+    editorGrid[r][c] = hasGoal(current) ? 'box_on_goal' : 'box';
+  } else if (activeTool === 'goal') {
+    if (current === 'player' || current === 'player_on_goal') {
+      editorGrid[r][c] = 'player_on_goal';
+    } else if (current === 'box' || current === 'box_on_goal') {
+      editorGrid[r][c] = 'box_on_goal';
+    } else {
+      editorGrid[r][c] = 'goal';
+    }
+  }
+
+  renderEditorGrid();
+  updateEditorStatus();
+}
+
+function removePlayer() {
+  for (let r = 0; r < editorGrid.length; r++) {
+    for (let c = 0; c < editorGrid[0].length; c++) {
+      if (editorGrid[r][c] === 'player') editorGrid[r][c] = 'floor';
+      if (editorGrid[r][c] === 'player_on_goal') editorGrid[r][c] = 'goal';
+    }
+  }
+}
+
+function countType(type) {
+  let n = 0;
+  for (const row of editorGrid) {
+    for (const cell of row) {
+      if (cell === type) n++;
+    }
+  }
+  return n;
+}
+
+function updateEditorStatus() {
+  const players = countType('player') + countType('player_on_goal');
+  const boxes = countType('box') + countType('box_on_goal');
+  const goals = countType('goal') + countType('player_on_goal') + countType('box_on_goal');
+  statusEl.innerHTML =
+    `<span class="label">Player:</span> <span class="value">${players}</span> &nbsp; ` +
+    `<span class="label">Boxes:</span> <span class="value">${boxes}</span> &nbsp; ` +
+    `<span class="label">Goals:</span> <span class="value">${goals}</span>`;
+}
+
+function validateGrid() {
+  const players = countType('player') + countType('player_on_goal');
+  const boxes = countType('box') + countType('box_on_goal');
+  const goals = countType('goal') + countType('player_on_goal') + countType('box_on_goal');
+
+  if (players !== 1) return 'Puzzle must have exactly 1 player.';
+  if (boxes === 0) return 'Puzzle must have at least 1 box.';
+  if (boxes !== goals) return `Number of boxes (${boxes}) must equal number of goals (${goals}).`;
+  return null;
+}
+
+function serializeGrid() {
+  const symbolMap = {
+    wall: '#', floor: ' ', player: '@', box: '$',
+    goal: '.', player_on_goal: '+', box_on_goal: '*',
+  };
+  return editorGrid.map(row => row.map(c => symbolMap[c] || ' ').join('')).join('\n');
+}
+
+// --- Editor buttons ---
+resizeBtn.addEventListener('click', () => {
+  const rows = Math.max(3, Math.min(12, parseInt(editRowsInput.value) || 6));
+  const cols = Math.max(3, Math.min(12, parseInt(editColsInput.value) || 6));
+  editRowsInput.value = rows;
+  editColsInput.value = cols;
+  initEditorGrid(rows, cols);
+  renderEditorGrid();
+  updateEditorStatus();
+  steps = null; moves = null;
+  setStepButtonState();
+  moveDisplay.innerHTML = '';
+});
+
+clearBtn.addEventListener('click', () => {
+  const rows = editorGrid.length;
+  const cols = editorGrid[0].length;
+  initEditorGrid(rows, cols);
+  renderEditorGrid();
+  updateEditorStatus();
+  steps = null; moves = null;
+  setStepButtonState();
+  moveDisplay.innerHTML = '';
+});
+
+solveCustomBtn.addEventListener('click', () => {
+  const error = validateGrid();
+  if (error) {
+    statusEl.innerHTML = `<span class="value" style="color:#e94560">${error}</span>`;
+    return;
+  }
+  currentPuzzleText = serializeGrid();
+
+  // Switch display to play-style rendering for solution playback
+  loadPuzzleText(currentPuzzleText);
+  solvePuzzle(currentPuzzleText, solveCustomBtn);
+});
 </script>
 </body>
 </html>

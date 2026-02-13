@@ -107,3 +107,67 @@ Single HTML file (`static/index.html`) with embedded CSS and JS:
 3. `curl localhost:5000/api/puzzles` — returns puzzle list JSON
 4. `curl -X POST localhost:5000/api/solve -H 'Content-Type: application/json' -d '{"puzzle":"#####\n#@$.#\n#####"}'` — returns solution JSON with steps
 5. Open `http://localhost:5000` in browser — load/solve/step through puzzles
+
+---
+
+# Puzzle Editor — Web Interface Extension
+
+## Context
+The web interface already has a working puzzle selector + solver flow. We add the ability for users to **design their own puzzles** — set room size, place walls/boxes/goals/player, then solve the custom puzzle using the existing `POST /api/solve` endpoint.
+
+Key encapsulation insight: the backend already accepts arbitrary puzzle text. The editor is purely a frontend feature that produces a Sokoban text string and feeds it into the same solve flow.
+
+## Data Model
+
+The editor maintains a 2D array `editorGrid[row][col]` where each cell holds one of:
+- `'floor'`, `'wall'`, `'player'`, `'box'`, `'goal'`, `'player_on_goal'`, `'box_on_goal'`
+
+When the user clicks "Solve Custom", the grid is serialized to standard Sokoban text (`#@$.*+ `) and sent to the existing `/api/solve` endpoint. No backend changes needed.
+
+## UI Design
+
+### Two modes: **Play** (existing) and **Edit** (new)
+
+A toggle or tab switches between them. Edit mode replaces the puzzle-selector area with editor controls.
+
+### Editor controls:
+1. **Size inputs** — Rows (3–12) and Cols (3–12) number inputs + "Resize" button. Initializes an all-floor grid with wall border.
+2. **Tool palette** — radio buttons to select what to place: Wall, Floor, Player, Box, Goal. Active tool is highlighted.
+3. **Click-to-paint** — clicking a cell sets it to the active tool. Click+drag to paint multiple walls/floors.
+4. **Solve Custom** button — validates (exactly 1 player, boxes == goals count, > 0 boxes), serializes to text, sends to `/api/solve`, enters the existing solution playback flow.
+5. **Clear** button — resets grid to empty room (wall border + floor interior).
+
+### Validation before solve:
+- Exactly 1 player
+- At least 1 box
+- Number of boxes == number of goals
+- Display clear error message if violated
+
+### Serialization (`editorGrid` → puzzle text):
+```
+editorGrid[r][c] → symbol:
+  wall → '#'
+  floor → ' '
+  player → '@'
+  box → '$'
+  goal → '.'
+  player_on_goal → '+'
+  box_on_goal → '*'
+```
+Join each row's symbols into a string, join rows with `\n`.
+
+### Smart placement logic:
+- Placing **player** on a **goal** cell → `player_on_goal`
+- Placing **box** on a **goal** cell → `box_on_goal`
+- Placing **goal** on a **player** cell → `player_on_goal`
+- Placing **goal** on a **box** cell → `box_on_goal`
+- Placing **player** removes any previous player (only one allowed)
+- Placing **floor** on a compound cell (player_on_goal, box_on_goal) → `goal` (preserves the goal underneath)
+
+## Files Modified
+1. **`static/index.html`** — add editor mode UI, JS logic for grid editing, serialization, and validation
+
+## Files NOT Modified
+- `app.py` — no backend changes needed
+- `sokoban.py` — solver untouched
+- `test_sokoban.py` — solver tests untouched
