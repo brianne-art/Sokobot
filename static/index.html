@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sokoban Solver</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 { color: #e94560; margin-bottom: 20px; }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  select, button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  select {
+    background: #16213e;
+    color: #e0e0e0;
+    border: 1px solid #0f3460;
+  }
+  button {
+    background: #0f3460;
+    color: #e0e0e0;
+    transition: background 0.2s;
+  }
+  button:hover:not(:disabled) { background: #e94560; }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  #grid {
+    display: inline-grid;
+    gap: 2px;
+    margin-bottom: 20px;
+    background: #16213e;
+    padding: 10px;
+    border-radius: 10px;
+  }
+  .cell {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    border-radius: 4px;
+  }
+  .cell-wall { background: #3a3a5c; }
+  .cell-floor { background: #232342; }
+  .cell-goal { background: #232342; }
+  .cell-goal::after { content: ''; width: 12px; height: 12px; background: #e94560; border-radius: 50%; }
+  .cell-box {
+    background: #232342;
+    position: relative;
+  }
+  .cell-box::after {
+    content: '';
+    width: 34px;
+    height: 34px;
+    background: #c47f17;
+    border-radius: 6px;
+    border: 2px solid #a06010;
+  }
+  .cell-box-on-goal {
+    background: #232342;
+    position: relative;
+  }
+  .cell-box-on-goal::after {
+    content: '';
+    width: 34px;
+    height: 34px;
+    background: #4ecca3;
+    border-radius: 6px;
+    border: 2px solid #38a882;
+  }
+  .cell-player {
+    background: #232342;
+    position: relative;
+  }
+  .cell-player::after {
+    content: '';
+    width: 30px;
+    height: 30px;
+    background: #e94560;
+    border-radius: 50%;
+  }
+  .cell-player-on-goal {
+    background: #232342;
+    position: relative;
+  }
+  .cell-player-on-goal::after {
+    content: '';
+    width: 30px;
+    height: 30px;
+    background: #e94560;
+    border-radius: 50%;
+    border: 3px solid #4ecca3;
+  }
+
+  .step-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  #status {
+    background: #16213e;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 300px;
+  }
+  #status .label { color: #888; font-size: 12px; }
+  #status .value { color: #4ecca3; font-weight: bold; }
+  #move-display {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #aaa;
+  }
+  #move-display .current-move { color: #e94560; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Sokoban Solver</h1>
+
+<div class="controls">
+  <select id="puzzle-select"></select>
+  <button id="load-btn">Load</button>
+  <button id="solve-btn" disabled>Solve</button>
+</div>
+
+<div id="grid"></div>
+
+<div class="step-controls">
+  <button id="prev-btn" disabled>&laquo; Prev</button>
+  <button id="play-btn" disabled>Play</button>
+  <button id="next-btn" disabled>Next &raquo;</button>
+</div>
+
+<div id="status"></div>
+<div id="move-display"></div>
+
+<script>
+const puzzleSelect = document.getElementById('puzzle-select');
+const loadBtn = document.getElementById('load-btn');
+const solveBtn = document.getElementById('solve-btn');
+const prevBtn = document.getElementById('prev-btn');
+const playBtn = document.getElementById('play-btn');
+const nextBtn = document.getElementById('next-btn');
+const gridEl = document.getElementById('grid');
+const statusEl = document.getElementById('status');
+const moveDisplay = document.getElementById('move-display');
+
+let puzzles = [];
+let currentPuzzleText = null;
+let grid = null;   // {walls, goals, dimensions}
+let steps = null;  // array of {player, boxes}
+let moves = null;  // array of direction strings
+let stepIndex = 0;
+let playInterval = null;
+
+// --- Init ---
+fetch('/api/puzzles')
+  .then(r => r.json())
+  .then(data => {
+    puzzles = data;
+    puzzles.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      puzzleSelect.appendChild(opt);
+    });
+  });
+
+// --- Load puzzle ---
+loadBtn.addEventListener('click', () => {
+  stopPlayback();
+  const selected = puzzles.find(p => p.id === puzzleSelect.value);
+  if (!selected) return;
+  currentPuzzleText = selected.text;
+  steps = null;
+  moves = null;
+  stepIndex = 0;
+
+  // Parse the text to get grid info for initial render
+  const lines = currentPuzzleText.split('\n');
+  const rows = lines.length;
+  const cols = Math.max(...lines.map(l => l.length));
+  const walls = [], goals = [], boxes = [];
+  let player = null;
+
+  for (let r = 0; r < lines.length; r++) {
+    for (let c = 0; c < lines[r].length; c++) {
+      const ch = lines[r][c];
+      if (ch === '#') walls.push([r, c]);
+      else if (ch === '@') player = [r, c];
+      else if (ch === '+') { player = [r, c]; goals.push([r, c]); }
+      else if (ch === '$') boxes.push([r, c]);
+      else if (ch === '*') { boxes.push([r, c]); goals.push([r, c]); }
+      else if (ch === '.') goals.push([r, c]);
+    }
+  }
+
+  grid = { walls, goals, dimensions: [rows, cols] };
+  steps = [{ player, boxes }];
+  stepIndex = 0;
+
+  renderGrid();
+  solveBtn.disabled = false;
+  setStepButtonState();
+  statusEl.innerHTML = '<span class="value">Puzzle loaded. Click Solve.</span>';
+  moveDisplay.innerHTML = '';
+});
+
+// --- Solve ---
+solveBtn.addEventListener('click', () => {
+  stopPlayback();
+  solveBtn.disabled = true;
+  statusEl.innerHTML = '<span class="value">Solving...</span>';
+
+  fetch('/api/solve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ puzzle: currentPuzzleText }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.solved) {
+        grid = data.grid;
+        steps = data.steps;
+        moves = data.moves;
+        stepIndex = 0;
+        renderGrid();
+        setStepButtonState();
+        statusEl.innerHTML =
+          `<span class="label">Moves:</span> <span class="value">${moves.length}</span> &nbsp; ` +
+          `<span class="label">States:</span> <span class="value">${data.stats.states_explored}</span> &nbsp; ` +
+          `<span class="label">Time:</span> <span class="value">${data.stats.time}s</span>`;
+        renderMoveList();
+      } else {
+        statusEl.innerHTML = `<span class="value" style="color:#e94560">${data.error}</span>`;
+        solveBtn.disabled = false;
+      }
+    })
+    .catch(err => {
+      statusEl.innerHTML = `<span class="value" style="color:#e94560">Error: ${err.message}</span>`;
+      solveBtn.disabled = false;
+    });
+});
+
+// --- Step controls ---
+prevBtn.addEventListener('click', () => { stopPlayback(); goStep(stepIndex - 1); });
+nextBtn.addEventListener('click', () => { stopPlayback(); goStep(stepIndex + 1); });
+playBtn.addEventListener('click', () => {
+  if (playInterval) {
+    stopPlayback();
+  } else {
+    if (stepIndex >= steps.length - 1) stepIndex = 0;
+    playBtn.textContent = 'Pause';
+    playInterval = setInterval(() => {
+      if (stepIndex >= steps.length - 1) { stopPlayback(); return; }
+      goStep(stepIndex + 1);
+    }, 400);
+  }
+});
+
+function stopPlayback() {
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
+  playBtn.textContent = 'Play';
+}
+
+function goStep(i) {
+  if (!steps || i < 0 || i >= steps.length) return;
+  stepIndex = i;
+  renderGrid();
+  setStepButtonState();
+  renderMoveList();
+}
+
+function setStepButtonState() {
+  const hasSolution = steps && steps.length > 1;
+  prevBtn.disabled = !hasSolution || stepIndex <= 0;
+  nextBtn.disabled = !hasSolution || stepIndex >= steps.length - 1;
+  playBtn.disabled = !hasSolution;
+}
+
+// --- Rendering ---
+function renderGrid() {
+  if (!grid || !steps) return;
+  const [rows, cols] = grid.dimensions;
+  const step = steps[stepIndex];
+
+  const wallSet = new Set(grid.walls.map(w => w[0] + ',' + w[1]));
+  const goalSet = new Set(grid.goals.map(g => g[0] + ',' + g[1]));
+  const boxSet = new Set(step.boxes.map(b => b[0] + ',' + b[1]));
+  const playerKey = step.player[0] + ',' + step.player[1];
+
+  gridEl.style.gridTemplateColumns = `repeat(${cols}, 48px)`;
+  gridEl.innerHTML = '';
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const key = r + ',' + c;
+
+      if (wallSet.has(key)) {
+        cell.classList.add('cell-wall');
+      } else if (key === playerKey && goalSet.has(key)) {
+        cell.classList.add('cell-player-on-goal');
+      } else if (key === playerKey) {
+        cell.classList.add('cell-player');
+      } else if (boxSet.has(key) && goalSet.has(key)) {
+        cell.classList.add('cell-box-on-goal');
+      } else if (boxSet.has(key)) {
+        cell.classList.add('cell-box');
+      } else if (goalSet.has(key)) {
+        cell.classList.add('cell-goal');
+      } else {
+        cell.classList.add('cell-floor');
+      }
+
+      gridEl.appendChild(cell);
+    }
+  }
+}
+
+function renderMoveList() {
+  if (!moves || moves.length === 0) { moveDisplay.innerHTML = ''; return; }
+  const dirLabels = { U: '\u2191', D: '\u2193', L: '\u2190', R: '\u2192' };
+  const parts = moves.map((m, i) => {
+    const label = dirLabels[m] || m;
+    if (i + 1 === stepIndex) return `<span class="current-move">${label}</span>`;
+    return `<span>${label}</span>`;
+  });
+  moveDisplay.innerHTML = `Step ${stepIndex}/${steps.length - 1}: ` + parts.join(' ');
+}
+</script>
+</body>
+</html>
